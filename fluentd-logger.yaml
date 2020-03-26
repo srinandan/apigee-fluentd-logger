@@ -1,0 +1,95 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Fluentd Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: apigee-fluent
+  namespace: apps
+  labels:
+    app: apigee-fluent
+spec:
+  ports:
+  - name: fluentd-tcp
+    port: 5140
+    protocol: TCP
+    targetPort: 5140
+  - name: fluentd-udp
+    port: 5140
+    protocol: UDP
+    targetPort: 5140
+  selector:
+    app: apigee-fluent
+---
+# Fluentd Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apigee-fluent
+  namespace: apps
+  labels:
+    app: apigee-fluent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: apigee-fluent
+  template:
+    metadata:
+      labels:
+        app: apigee-fluent
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+      - name: fluentd
+        image: fluent/fluentd        
+        resources:
+          limits:
+            memory: 500Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - name: config-volume
+          mountPath:  /fluentd/etc          
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: config-volume
+        configMap:
+          defaultMode: 0644
+          name: fluentd-config
+---
+# Fluentd ConfigMap, contains config files.
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: apigee-fluent-config
+  namespace: apps
+data:
+  fluent.conf: |-  
+    # Takes the messages sent over UDP
+    <source>
+      @type syslog
+      tag apigee
+      port 5140
+      bind 0.0.0.0
+      <parse>
+        message_format rfc5424
+      </parse>      
+    </source>
+    <match apigee.**>
+       @type stdout
+    </match>
