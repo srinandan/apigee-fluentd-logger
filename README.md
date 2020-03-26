@@ -74,4 +74,67 @@ OUTPUT:
 20xx-xx-xx 00:41:56.849000000 +0000 apigee.user.info: {"host":"9178f6a4-6e9b-49d8-be5a-e9ac1af1a106","ident":"Apigee-Edge","pid":"-","msgid":"-","extradata":"-","message":"Response message: Hello, Guest!\u0000"}
 ```
 
+### Stackdriver Logging
+
+To send the Message Logger policy output to Stackdriver logs, use the google-fluentd image.
+
+```
+      containers:
+      - name: fluentd
+        image: google/apigee-stackdriver-logging-agent:1.6.8
+```
+
+Mount a service account with Log Write role.
+
+```
+kubectl create secret -n apps generic logging-svc-account --from-file client_secret.json
+```
+
+In the deployment spec:
+```
+      - name: svc-account-volume
+        secret:
+          defaultMode: 420
+          secretName: logging-svc-account
+```
+
+Finally, change the fluentd configuration to look like:
+
+```
+  fluent.conf: |-  
+    <source>
+      @type syslog
+      tag apigee
+      port 5140
+      bind 0.0.0.0
+      <parse>
+        message_format rfc5424
+      </parse>
+    </source>
+    <filter **>
+      @type add_insert_ids
+      insert_id_key apigee-message-logger
+    </filter>
+    <match **>
+      @type google_cloud
+      project_id xxx
+    </match>
+```
+
+#### Viewing the logs
+
+Check the fluentd logs to see the instance Id for the logs:
+
+Example:
+```
+20xx-xx-xx 21:03:19 +0000 [info]: adding match pattern="**" type="google_cloud"
+20xx-xx-xx 21:03:19 +0000 [info]: #0 Detected GCE platform
+20xx-xx-xx 21:03:19 +0000 [info]: #0 Logs viewer address: https://console.cloud.google.com/logs/viewer?project=xxxx&resource=container/instance_id/3266770578670000001
+20xx-xx-xx 21:03:19 +0000 [info]: adding source type="syslog"
+```
+
+Open the link in your browser and view logs
+
+![alt text](./stackdriver.png "Stackdriver logs")
+
 Thank you [Sukruth](https://www.linkedin.com/in/sukruth-manjunath-809a598a) for helping with these intructions.

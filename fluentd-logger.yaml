@@ -16,10 +16,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: apigee-fluent
+  name: apigee-fluentd
   namespace: apps
   labels:
-    app: apigee-fluent
+    app: apigee-fluentd
 spec:
   ports:
   - name: fluentd-tcp
@@ -31,52 +31,66 @@ spec:
     protocol: UDP
     targetPort: 5140
   selector:
-    app: apigee-fluent
+    app: apigee-fluentd
 ---
 # Fluentd Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: apigee-fluent
+  name: apigee-fluentd
   namespace: apps
   labels:
-    app: apigee-fluent
+    app: apigee-fluentd
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: apigee-fluent
+      app: apigee-fluentd
   template:
     metadata:
       labels:
-        app: apigee-fluent
+        app: apigee-fluentd
       annotations:
         sidecar.istio.io/inject: "false"
     spec:
       containers:
       - name: fluentd
-        image: fluent/fluentd        
+        #image: fluent/fluentd
+        image: google/apigee-stackdriver-logging-agent:1.6.8        
         resources:
           limits:
             memory: 500Mi
           requests:
             cpu: 100m
             memory: 200Mi
+        env:
+          - name: GOOGLE_APPLICATION_CREDENTIALS
+            value: /etc/secret/client_secret.json #ensure the file name matches the kubectl secret
         volumeMounts:
         - name: config-volume
-          mountPath:  /fluentd/etc          
+          #mountPath:  /fluentd/etc
+          mountPath: /etc/google-fluentd/config.d
+        - name: svc-account-volume
+          mountPath: /etc/secret
+          readOnly: true
       terminationGracePeriodSeconds: 30
       volumes:
       - name: config-volume
         configMap:
           defaultMode: 0644
-          name: fluentd-config
+          name: apigee-fluentd-config
+      - name: svc-account-volume
+        secret:
+          defaultMode: 420
+          secretName: logging-svc-account
+      nodeSelector:
+        cloud.google.com/gke-nodepool: apps          
 ---
 # Fluentd ConfigMap, contains config files.
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: apigee-fluent-config
+  name: apigee-fluentd-config
   namespace: apps
 data:
   fluent.conf: |-  
@@ -90,6 +104,14 @@ data:
         message_format rfc5424
       </parse>      
     </source>
-    <match apigee.**>
-       @type stdout
+    #<match apigee.**>
+    #   @type stdout
+    #</match>
+    <filter **>
+      @type add_insert_ids
+      insert_id_key apigee-message-logger
+    </filter>
+    <match **>
+      @type google_cloud
+      project_id srinandans-apigee
     </match>
