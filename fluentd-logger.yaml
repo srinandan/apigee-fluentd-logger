@@ -12,6 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apps
+---
 # Fluentd Service
 apiVersion: v1
 kind: Service
@@ -83,8 +88,16 @@ spec:
         secret:
           defaultMode: 420
           secretName: logging-svc-account
-      nodeSelector:
-        cloud.google.com/gke-nodepool: apps          
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: cloud.google.com/gke-nodepool
+                operator: In
+                values:
+                - apps
+            weight: 100
 ---
 # Fluentd ConfigMap, contains config files.
 kind: ConfigMap
