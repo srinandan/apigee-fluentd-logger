@@ -69,26 +69,27 @@ spec:
           requests:
             cpu: 100m
             memory: 200Mi
-        env:
-          - name: GOOGLE_APPLICATION_CREDENTIALS
-            value: /etc/secret/client_secret.json #ensure the file name matches the kubectl secret
         volumeMounts:
         - name: config-volume
-          #mountPath:  /fluentd/etc
           mountPath: /etc/google-fluentd/config.d
-        - name: svc-account-volume
-          mountPath: /etc/secret
+        - name: ksa-token          
+          mountPath: /etc/ksa-token
           readOnly: true
       terminationGracePeriodSeconds: 30
+      serviceAccountName: logging-svc-account
       volumes:
       - name: config-volume
         configMap:
           defaultMode: 0644
           name: apigee-fluentd-config
-      - name: svc-account-volume
-        secret:
+      - name: ksa-token
+        projected:
           defaultMode: 420
-          secretName: logging-svc-account
+          sources:
+          - serviceAccountToken:
+              audience: srinandans.svc.id.goog
+              expirationSeconds: 172800
+              path: ksa-token          
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -125,7 +126,13 @@ data:
       @type add_insert_ids
       insert_id_key apigee-message-logger
     </filter>
-    #<match **>
-    #  @type google_cloud
-    #  project_id xxxxxxxxx
-    #</match>
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: logging-svc-account
+  namespace: apps
+  annotations:
+    iam.gke.io/gcp-service-account: logwriter@srinandans.iam.gserviceaccount.com
+
+## gcloud iam service-accounts add-iam-policy-binding --role roles/iam.workloadIdentityUser --member "serviceAccount:srinandans.svc.id.goog[apps/logging-svc-account]" logwriter@srinandans.iam.gserviceaccount.com

@@ -138,3 +138,9 @@ Open the link in your browser and view logs
 ![alt text](./stackdriver.png "Stackdriver logs")
 
 Thank you [Sukruth](https://www.linkedin.com/in/sukruth-manjunath-809a598a) for helping with these intructions.
+
+___
+
+## Support
+
+This is not an officially supported Google product
