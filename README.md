@@ -143,4 +143,4 @@ ___
 
 ## Support
 
-This is not an officially supported Google product
+This is not an officially supported Google product. Issues, feature requests, or general support requests should be created here on the repo. Contributions are welcomed.
